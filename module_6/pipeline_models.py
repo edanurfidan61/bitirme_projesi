@@ -22,27 +22,39 @@ for subdir in ["Regression", "classification"]:
         sys.path.insert(0, sub_path)
 
 
-def _resolve_dirs(use_fe: bool):
+def _resolve_dirs(use_fe: bool, fe_dir: str = None):
     if use_fe:
-        dataset_dir = os.path.join(_MODUL6_DIR, "dataset_output_fe")
-        outputs_dir = os.path.join(_MODUL6_DIR, "model_outputs_fe")
-        tag = "[FE]"
+        if fe_dir:
+            dataset_dir = fe_dir
+            # Infer output dir from fe_dir name
+            if "dataset_output_fe" in fe_dir:
+                outputs_suffix = fe_dir.split("dataset_output")[-1]
+                outputs_dir = os.path.join(
+                    _MODUL6_DIR, f"model_outputs{outputs_suffix}"
+                )
+            else:
+                outputs_dir = os.path.join(_MODUL6_DIR, "model_outputs_fe")
+            tag = f"[FE: {os.path.basename(fe_dir)}]"
+        else:
+            dataset_dir = os.path.join(_MODUL6_DIR, "dataset_output_fe")
+            outputs_dir = os.path.join(_MODUL6_DIR, "model_outputs_fe")
+            tag = "[FE]"
     else:
         dataset_dir = os.path.join(_MODUL6_DIR, "dataset_output")
         outputs_dir = os.path.join(_MODUL6_DIR, "model_outputs")
-        tag = "[HAM]"
+        tag = "[RAW]"
 
     if not os.path.isdir(dataset_dir):
-        print(f"HATA: Veri klasörü bulunamadı: {dataset_dir}")
+        print(f"ERROR: Dataset folder not found: {dataset_dir}")
         if use_fe:
-            print("  Önce `python feature_engineering.py` çalıştırın.")
+            print("  Run `python feature_engineering.py` first.")
         sys.exit(1)
 
     return dataset_dir, outputs_dir, tag
 
 
-def run_all(use_fe: bool = False, binary: bool = False):
-    dataset_dir, outputs_dir, tag = _resolve_dirs(use_fe)
+def run_all(use_fe: bool = False, binary: bool = False, fe_dir: str = None):
+    dataset_dir, outputs_dir, tag = _resolve_dirs(use_fe, fe_dir)
 
     print("=" * 70)
     print(f"TÜM MODELLER ÇALIŞTIRILIYOR  {tag}")
@@ -88,11 +100,11 @@ def run_all(use_fe: bool = False, binary: bool = False):
     return outputs_dir
 
 
-def compare(outputs_dir: str = None, use_fe: bool = False, binary: bool = False):
+def compare(outputs_dir: str = None, use_fe: bool = False, binary: bool = False, fe_dir: str = None):
     import matplotlib.pyplot as plt
 
     if outputs_dir is None:
-        _, outputs_dir, _ = _resolve_dirs(use_fe)
+        _, outputs_dir, _ = _resolve_dirs(use_fe, fe_dir)
     compare_dir = os.path.join(outputs_dir, "compare")
 
     print(f"\n\n{'='*70}")
@@ -223,30 +235,40 @@ def compare(outputs_dir: str = None, use_fe: bool = False, binary: bool = False)
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Tüm modelleri çalıştır ve karşılaştır"
+        description="Run all models and compare results"
     )
     parser.add_argument(
         "--fe",
         action="store_true",
-        help="dataset_output_fe/ kullan (özellik mühendisliği sonrası)",
+        help="Use dataset_output_fe/ (after feature engineering)",
+    )
+    parser.add_argument(
+        "--fe-dir",
+        type=str,
+        default=None,
+        help="Path to custom feature engineering output folder",
     )
     parser.add_argument(
         "--binary",
         action="store_true",
-        help="Sınıflandırmada Ph.Eur. 3.5 binary modu kullan",
+        help="Ph.Eur. binary classification for y_stress",
     )
     parser.add_argument(
         "--compare-only",
         action="store_true",
-        help="Sadece karşılaştırma tablosu/grafik üret",
+        help="Generate comparison table/plots only",
     )
     args = parser.parse_args()
 
     if args.compare_only:
-        compare(use_fe=args.fe, binary=args.binary)
+        compare(use_fe=args.fe or (args.fe_dir is not None),
+                binary=args.binary, fe_dir=args.fe_dir)
     else:
-        outputs_dir = run_all(use_fe=args.fe, binary=args.binary)
-        compare(outputs_dir=outputs_dir, use_fe=args.fe, binary=args.binary)
+        outputs_dir = run_all(use_fe=args.fe or (args.fe_dir is not None),
+                              binary=args.binary, fe_dir=args.fe_dir)
+        compare(outputs_dir=outputs_dir,
+                use_fe=args.fe or (args.fe_dir is not None),
+                binary=args.binary, fe_dir=args.fe_dir)
 
 
 if __name__ == "__main__":
